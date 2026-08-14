@@ -13,48 +13,43 @@ function hexToAnsi(color: string): string {
   return `\x1b[38;2;${r};${g};${b}m`;
 }
 
-// ThemeColor names — matched to pi's Theme.fg() API.
-// When a pi theme is active, these names are passed to theme.fg().
-// The FALLBACK_HEX map provides pastel values aligned with the
-// @nilskluewer/pi-cost-transparency-statusline footer palette so the
-// sidebar and footer look cohesive even without a theme.
+// Pastel palette aligned with the @nilskluewer/pi-cost-transparency-statusline
+// footer colors. We use hex directly instead of theme.fg() so the sidebar
+// always shows vibrant pastel colors regardless of the active pi theme.
+const PALETTE: Record<string, string> = {
+  accent:   "#a8e6a3",  // pastel green
+  success:  "#a8e6a3",  // pastel green
+  warning:  "#ff9aa2",  // pastel red
+  text:     "#b8c0ff",  // pastel periwinkle
+  muted:    "#aaa6c2",  // muted lavender
+  branch:   "#ffbe98",  // soft peach
+  model:    "#b8c0ff",  // pastel periwinkle
+  thinking: "#ffe28a",  // soft sunshine
+  label:    "#aaa6c2",  // muted lavender
+  tokIn:    "#a8e6a3",  // pastel green
+  tokOut:   "#ff9aa2",  // pastel red
+  context:  "#c3b1e1",  // soft lavender
+  sep:      "#504c60",  // muted plum
+  cost:     "#98e4c6",  // pastel mint
+};
+
+// COLORS maps semantic names to palette keys (kept for readability at call sites)
 export const COLORS = {
   accent:   "accent",
   success:  "success",
   warning:  "warning",
   header:   "text",
   muted:    "muted",
-  // Extended names — these resolve to theme colors when available,
-  // otherwise fall back to pastel hex values below.
-  branch:   "accent",
-  model:    "accent",
-  thinking: "warning",
-  label:    "muted",
-  tokIn:    "success",
-  tokOut:   "warning",
-  context:  "accent",
-  sep:      "muted",
-  cost:     "success",
+  branch:   "branch",
+  model:    "model",
+  thinking: "thinking",
+  label:    "label",
+  tokIn:    "tokIn",
+  tokOut:   "tokOut",
+  context:  "context",
+  sep:      "sep",
+  cost:     "cost",
 } as const;
-
-// Pastel fallback palette — mirrors the footer statusline colors so the
-// sidebar matches even before the pi theme is injected.
-const FALLBACK_HEX: Record<string, string> = {
-  accent:   "#a8cfa3",  // pastel green (matches footer tokIn)
-  success:  "#a8e6a3",  // pastel green
-  warning:  "#ff9aa2",  // pastel red (matches footer tokOut)
-  text:     "#b8c0ff",  // pastel periwinkle (matches footer model)
-  muted:    "#aaa6c2",  // muted lavender (matches footer label)
-  branch:   "#ffbe98",  // soft peach (matches footer branch)
-  model:    "#b8c0ff",  // pastel periwinkle
-  thinking: "#ffe28a",  // soft sunshine (matches footer thinking)
-  label:    "#aaa6c2",  // muted lavender
-  tokIn:    "#a8e6a3",  // pastel green
-  tokOut:   "#ff9aa2",  // pastel red
-  context:  "#c3b1e1",  // soft lavender (matches footer context)
-  sep:      "#504c60",  // muted plum (matches footer sep)
-  cost:     "#98e4c6",  // pastel mint (matches footer costTotal)
-};
 
 let _piTheme: any = null;
 
@@ -68,21 +63,21 @@ export function bold(text: string): string {
 }
 
 export function dim(text: string): string {
+  // Always use theme dim when available — it's a standard color
   if (_piTheme) return _piTheme.fg("dim", text);
   return `${DIM_CODE}${text}${RESET}`;
 }
 
 export function fg(colorName: string, text: string): string {
+  // Use hex directly for vibrant pastel colors that match the footer.
+  // Only "dim" delegates to the theme (it's a standard, non-pastel color).
+  const hex = PALETTE[colorName];
+  if (hex) return `${hexToAnsi(hex)}${text}${RESET}`;
+  // Unknown color — try theme, then fall back to muted lavender
   if (_piTheme) {
-    // Try the theme color name; if the theme doesn't know it, fall back to hex.
-    try {
-      return _piTheme.fg(colorName, text);
-    } catch {
-      // fall through to hex
-    }
+    try { return _piTheme.fg(colorName, text); } catch { /* fall through */ }
   }
-  const hex = FALLBACK_HEX[colorName] ?? FALLBACK_HEX.muted ?? "#aaa6c2";
-  return `${hexToAnsi(hex)}${text}${RESET}`;
+  return `${hexToAnsi(PALETTE.muted)}${text}${RESET}`;
 }
 
 export function formatDuration(ms: number): string {

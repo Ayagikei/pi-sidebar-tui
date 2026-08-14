@@ -7,7 +7,7 @@ import { getMcpServers } from "./mcp.ts";
 import { setPiTheme } from "./colors.ts";
 
 const TOOL_LOG_MAX = 10;
-const SUBAGENT_TOOL_PATTERN = /^(task|dispatch|agent)/i;
+const SUBAGENT_TOOL_PATTERN = /^(subagent|task|dispatch|agent)/i;
 const TODO_TOOL_PATTERN = /todo/i;
 const WRITE_TOOLS = new Set(["write", "edit", "bash", "computer"]);
 
