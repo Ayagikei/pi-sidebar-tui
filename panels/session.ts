@@ -3,6 +3,15 @@ import { dim, fg, COLORS, panelHeader, trunc } from "../colors.ts";
 
 const NA = "—";
 
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h${m % 60}m`;
+  if (m > 0) return `${m}m${s % 60}s`;
+  return `${s}s`;
+}
+
 export function renderSessionPanel(ctx: SidebarContext, width: number): string[] {
   const lines: string[] = [...panelHeader("Session", width)];
 
@@ -11,7 +20,13 @@ export function renderSessionPanel(ctx: SidebarContext, width: number): string[]
     lines.push(dim("  (waiting for first message…)"));
   } else {
     const truncated = trunc(title, Math.max(0, width - 2));
-    lines.push(dim(`  ${truncated}`));
+    lines.push(fg(COLORS.model, `  ${truncated}`));
+  }
+
+  // Short session ID (first 8 chars)
+  if (ctx.sessionId) {
+    const shortId = ctx.sessionId.slice(0, 8);
+    lines.push(dim(`  ${shortId}`));
   }
 
   lines.push("");
@@ -24,29 +39,45 @@ export function renderSessionPanel(ctx: SidebarContext, width: number): string[]
     lines.push("");
   }
 
-  // Slim stats: time, turns, last turn duration, speed
+  // Stats: time, turns, last turn, speed
   const elapsed = Date.now() - ctx.sessionStartMs;
   const avgTps = ctx.liveTps ?? ctx.lastTps;
 
-  const stats: [string, string][] = [
-    ["time", elapsed >= 1000 ? formatDuration(elapsed) : NA],
-    ["turns", ctx.turnCount > 0 ? String(ctx.turnCount) : NA],
-    ["last", ctx.lastTurnMs !== null ? formatDuration(ctx.lastTurnMs) : NA],
-    ["speed", avgTps !== null ? `${avgTps} tok/s` : NA],
+  const stats: [string, string, string][] = [
+    ["time",   elapsed >= 1000 ? formatDuration(elapsed) : NA,                   "label"],
+    ["turns",  ctx.turnCount > 0 ? String(ctx.turnCount) : NA,                    "accent"],
+    ["last",   ctx.lastTurnMs !== null ? formatDuration(ctx.lastTurnMs) : NA,     "label"],
+    ["speed",  avgTps !== null ? `${avgTps} tok/s` : NA,                          "thinking"],
   ];
 
-  for (const [label, value] of stats) {
-    lines.push(dim(`  ${label.padEnd(5)} `) + fg(COLORS.muted, value));
+  for (const [label, value, color] of stats) {
+    lines.push(dim(`  ${label.padEnd(5)} `) + fg(COLORS[color] ?? COLORS.muted, value));
+  }
+
+  // Current turn live timer (if agent is active)
+  if (ctx.agentActive && ctx.currentTurnMs !== null) {
+    lines.push(dim("  now   ") + fg(COLORS.warning, formatDuration(ctx.currentTurnMs)));
+  }
+
+  // Turn history — recent durations as a sparkline-like row
+  if (ctx.turnDurations.length > 0) {
+    lines.push("");
+    lines.push(dim("  turns:"));
+    const bars = ctx.turnDurations.map(d => {
+      const s = Math.round(d / 1000);
+      if (s >= 60) return fg(COLORS.warning, "▆");
+      if (s >= 30) return fg(COLORS.thinking, "▄");
+      if (s >= 10) return fg(COLORS.accent, "▂");
+      return fg(COLORS.success, "▁");
+    });
+    // Show last N turn durations as compact labels
+    const recent = ctx.turnDurations.slice(-6);
+    const labels = recent.map(d => formatDuration(d));
+    const labelStr = labels.join(dim(" · "));
+    lines.push(dim("  ") + labelStr);
+    // Sparkline
+    lines.push(dim("  ") + bars.join(""));
   }
 
   return lines;
-}
-
-function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h${m % 60}m`;
-  if (m > 0) return `${m}m${s % 60}s`;
-  return `${s}s`;
 }

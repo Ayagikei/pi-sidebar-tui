@@ -25,16 +25,15 @@ function wrapText(text: string, maxWidth: number): string[] {
   const lines: string[] = [];
   let remaining = text;
   while (visibleWidth(remaining) > maxWidth && remaining.length > 0) {
-    // Find the longest prefix that fits
     let cut = 0;
     let w = 0;
     for (const ch of remaining) {
       const cw = visibleWidth(ch);
       if (w + cw > maxWidth) break;
-      cut += ch.length; // advance by code units, not visible width
+      cut += ch.length;
       w += cw;
     }
-    if (cut === 0) cut = remaining.length; // single wide char, force it
+    if (cut === 0) cut = remaining.length;
     lines.push(remaining.slice(0, cut));
     remaining = remaining.slice(cut);
   }
@@ -47,18 +46,33 @@ function renderTodoLines(todo: TodoItem, width: number): string[] {
   const contentMax = Math.max(0, width - INDENT);
 
   let text = todo.content;
+  let subAction: string | null = null;
   if (todo.status === "in_progress" && todo.subAction) {
-    text = `${todo.content} (${todo.subAction})`;
+    subAction = `(${todo.subAction})`;
+    text = todo.content;
   }
 
   const wrapped = wrapText(text, contentMax);
   const result: string[] = [];
   for (let i = 0; i < wrapped.length; i++) {
     if (i === 0) {
-      result.push(`${glyph} ${wrapped[i]}`);
+      let line = `${glyph} ${wrapped[i]}`;
+      // Append sub-action on the first line if it fits, else on its own line
+      if (subAction) {
+        const remaining = contentMax - visibleWidth(wrapped[i]) - 1;
+        if (remaining > visibleWidth(subAction) + 2) {
+          line += dim(` (${subAction})`);
+          subAction = null;
+        }
+      }
+      result.push(line);
     } else {
       result.push(`${" ".repeat(CONTINUE_INDENT)}${dim(wrapped[i])}`);
     }
+  }
+  // Sub-action didn't fit on any content line — show it dimmed
+  if (subAction) {
+    result.push(`${" ".repeat(CONTINUE_INDENT)}${dim(`(${subAction})`)}`);
   }
   return result;
 }
@@ -66,6 +80,7 @@ function renderTodoLines(todo: TodoItem, width: number): string[] {
 export function renderTodosPanel(ctx: SidebarContext, width: number): string[] {
   const { todos } = ctx;
   const done = todos.filter(t => t.status === "completed").length;
+  const inProgress = todos.filter(t => t.status === "in_progress").length;
   const title = `Todos (${done}/${todos.length})`;
   const lines: string[] = [...panelHeader(title, width)];
 

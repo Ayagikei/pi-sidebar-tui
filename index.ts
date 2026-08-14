@@ -39,6 +39,8 @@ let msgStartMs: number | null = null;
 let liveTps: number | null = null;
 let lastTps: number | null = null;
 let lastTurnMs: number | null = null;
+let turnDurations: number[] = [];
+const TURN_HISTORY_MAX = 8;
 let tpsSamples: { t: number; tokens: number }[] = [];
 const TPS_WINDOW_MS = 2000;
 let sessionTimerHandle: ReturnType<typeof setInterval> | null = null;
@@ -144,6 +146,9 @@ function buildSidebarContext(cwd: string | undefined): SidebarContext {
     liveTps,
     lastTps,
     lastTurnMs,
+    turnDurations,
+    agentActive: agentStartMs !== null,
+    currentTurnMs: agentStartMs !== null ? Date.now() - agentStartMs : null,
   };
 }
 
@@ -315,6 +320,7 @@ export default function piSidebar(pi: ExtensionAPI) {
     liveTps = null;
     lastTps = null;
     lastTurnMs = null;
+    turnDurations = [];
     tpsSamples = [];
     sessionTitle = null;
     todos = [];
@@ -475,6 +481,8 @@ export default function piSidebar(pi: ExtensionAPI) {
     activeTool = null;
     if (agentStartMs !== null) {
       lastTurnMs = Date.now() - agentStartMs;
+      turnDurations.push(lastTurnMs);
+      if (turnDurations.length > TURN_HISTORY_MAX) turnDurations.shift();
       agentStartMs = null;
     }
     requestRender?.();
@@ -495,6 +503,7 @@ export default function piSidebar(pi: ExtensionAPI) {
     liveTps = null;
     lastTps = null;
     lastTurnMs = null;
+    turnDurations = [];
     tpsSamples = [];
     updateContextUsage(ctx);
     requestRender?.();

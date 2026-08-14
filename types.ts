@@ -64,4 +64,10 @@ export interface SidebarContext {
   liveTps: number | null;
   lastTps: number | null;
   lastTurnMs: number | null;
+  /** Durations of recent turns (ms), oldest first. */
+  turnDurations: number[];
+  /** Whether an agent turn is currently in progress. */
+  agentActive: boolean;
+  /** Elapsed ms of the current agent turn (if active). */
+  currentTurnMs: number | null;
 }

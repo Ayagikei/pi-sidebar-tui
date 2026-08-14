@@ -3,13 +3,6 @@ import type { SidebarContext } from "../types.ts";
 import { bold, dim, fg, COLORS, formatDiffStat, trunc } from "../colors.ts";
 import type { WorkspaceFile } from "../types.ts";
 
-function buildGitStatus(branch: string, ahead: number, untracked: number): string {
-  let status = `⎇ ${branch}`;
-  if (ahead > 0) status += ` +${ahead}`;
-  if (untracked > 0) status += ` ?${untracked}`;
-  return status;
-}
-
 function renderWorkspaceHeader(ctx: SidebarContext, width: number): string[] {
   const left = bold(" Workspace");
   const leftPlain = " Workspace";
@@ -18,33 +11,47 @@ function renderWorkspaceHeader(ctx: SidebarContext, width: number): string[] {
     return [left, dim("─".repeat(Math.max(0, width)))];
   }
 
-  const gitStatus = buildGitStatus(ctx.branch, ctx.aheadCount, ctx.untrackedCount);
+  // Build a rich git status string: branch + ahead + untracked
+  let status = `⎇ ${ctx.branch}`;
+  if (ctx.aheadCount > 0) status += ` ↑${ctx.aheadCount}`;
+  if (ctx.untrackedCount > 0) status += ` ?${ctx.untrackedCount}`;
+
   const leftLen = visibleWidth(leftPlain);
-  let rightLen = visibleWidth(gitStatus);
+  let rightLen = visibleWidth(status);
   const minPadding = 1;
 
-  // If the right side is too long, truncate it
-  let displayStatus = gitStatus;
+  let displayStatus = status;
   if (leftLen + minPadding + rightLen > width) {
     const maxStatusLen = Math.max(0, width - leftLen - minPadding);
-    displayStatus = trunc(gitStatus, maxStatusLen);
+    displayStatus = trunc(status, maxStatusLen);
   }
 
   rightLen = visibleWidth(displayStatus);
   const padding = Math.max(1, width - leftLen - rightLen);
-  const headerLine = `${left}${" ".repeat(padding)}${dim(displayStatus)}`;
 
+  // Color the ahead/untracked parts
+  let coloredStatus = fg(COLORS.branch, `⎇ ${ctx.branch}`);
+  if (ctx.aheadCount > 0) coloredStatus += fg(COLORS.warning, ` ↑${ctx.aheadCount}`);
+  if (ctx.untrackedCount > 0) coloredStatus += dim(` ?${ctx.untrackedCount}`);
+
+  const headerLine = `${left}${" ".repeat(padding)}${coloredStatus}`;
   return [headerLine, dim("─".repeat(Math.max(0, width)))];
 }
 
-function renderFileLine(file: WorkspaceFile, width: number): string {
+function renderFileLine(file: WorkspaceFile, width: number): string[] {
   const stat = formatDiffStat(file.added, file.removed);
   const statLen = visibleWidth(stat);
   const pathMax = Math.max(0, width - statLen - 1);
   const path = trunc(file.path, pathMax);
   const pathLen = visibleWidth(path);
   const padding = Math.max(1, width - pathLen - statLen);
-  return `${path}${" ".repeat(padding)}${fg(COLORS.success, stat)}`;
+
+  // Color the diff stat: green for additions, red for removals
+  const coloredStat = file.removed > 0
+    ? fg(COLORS.tokIn, `+${file.added}`) + " " + fg(COLORS.tokOut, `-${file.removed}`)
+    : fg(COLORS.tokIn, stat);
+
+  return [`${dim(path)}${" ".repeat(padding)}${coloredStat}`];
 }
 
 export function renderWorkspacePanel(ctx: SidebarContext, width: number): string[] {
@@ -61,8 +68,17 @@ export function renderWorkspacePanel(ctx: SidebarContext, width: number): string
     return lines;
   }
 
+  // Summary line: total changed files + total additions/removals
+  const totalAdded = files.reduce((s, f) => s + f.added, 0);
+  const totalRemoved = files.reduce((s, f) => s + f.removed, 0);
+  const summary = `${files.length} files  ` +
+    fg(COLORS.tokIn, `+${totalAdded}`) +
+    (totalRemoved > 0 ? " " + fg(COLORS.tokOut, `-${totalRemoved}`) : "");
+  lines.push(dim("  ") + summary);
+  lines.push("");
+
   for (const file of files) {
-    lines.push(renderFileLine(file, width));
+    lines.push(...renderFileLine(file, width));
   }
 
   return lines;

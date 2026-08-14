@@ -31,15 +31,15 @@ function renderSubagentBlock(agent: SubagentEntry, width: number): string[] {
     const duration = agent.completedAt - agent.startedAt;
     const ago = now - agent.completedAt;
     lines.push(dim(`  complete (${formatRelativeTime(ago)})`));
-    const meta = `${agent.turns} turns · ${agent.toolCount} tools · ${formatTokens(agent.tokens)} tokens · ${formatDuration(duration)}`;
+    const meta = `${agent.turns} turns · ${agent.toolCount} tools · ${formatTokens(agent.tokens)} tok · ${formatDuration(duration)}`;
     lines.push(dim(`  ${trunc(meta, Math.max(0, width - 2))}`));
   } else if (agent.status === "failed") {
     lines.push(dim(`  failed (${formatRelativeTime(elapsed)})`));
-    const meta = `${agent.turns} turns · ${agent.toolCount} tools · ${formatTokens(agent.tokens)} tokens`;
+    const meta = `${agent.turns} turns · ${agent.toolCount} tools · ${formatTokens(agent.tokens)} tok`;
     lines.push(dim(`  ${trunc(meta, Math.max(0, width - 2))}`));
   } else {
     lines.push(dim(`  running (${formatDuration(elapsed)})`));
-    const meta = `${agent.turns} turns · ${agent.toolCount} tools · ${formatTokens(agent.tokens)} tokens`;
+    const meta = `${agent.turns} turns · ${agent.toolCount} tools · ${formatTokens(agent.tokens)} tok`;
     lines.push(dim(`  ${trunc(meta, Math.max(0, width - 2))}`));
   }
 
@@ -57,7 +57,7 @@ export function renderSubagentsPanel(ctx: SidebarContext, width: number): string
   const completed = subagents.filter(a => a.status === "completed").length;
 
   const parallelSuffix = running > 1 ? " · parallel" : "";
-  const title = `Async Subagents (${completed}/${subagents.length})${parallelSuffix}`;
+  const title = `Subagents (${completed}/${subagents.length})${parallelSuffix}`;
   const lines: string[] = [...panelHeader(title, width)];
 
   if (subagents.length === 0) {
