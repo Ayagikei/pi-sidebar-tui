@@ -1,11 +1,11 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { SidebarContext } from "../types.ts";
-import { bold, dim, fg, COLORS, formatDiffStat, trunc } from "../colors.ts";
+import { bold, dim, fg, COLORS, formatDiffStat, panelTitle, trunc } from "../colors.ts";
 import type { WorkspaceFile } from "../types.ts";
 
 function renderWorkspaceHeader(ctx: SidebarContext, width: number): string[] {
-  const left = bold(" Workspace");
-  const leftPlain = " Workspace";
+  const left = bold(" " + panelTitle("Workspace"));
+  const leftPlain = " " + panelTitle("Workspace");
 
   if (!ctx.branch) {
     return [left, dim("─".repeat(Math.max(0, width)))];

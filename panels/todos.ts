@@ -1,6 +1,6 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { SidebarContext, TodoItem, TodoStatus } from "../types.ts";
-import { dim, fg, COLORS, panelHeader, trunc } from "../colors.ts";
+import { dim, fg, COLORS, panelHeader, panelTitle, trunc } from "../colors.ts";
 
 const GLYPHS: Record<TodoStatus, string> = {
   completed: "✓",
@@ -81,7 +81,7 @@ export function renderTodosPanel(ctx: SidebarContext, width: number): string[] {
   const { todos } = ctx;
   const done = todos.filter(t => t.status === "completed").length;
   const inProgress = todos.filter(t => t.status === "in_progress").length;
-  const title = `Todos (${done}/${todos.length})`;
+  const title = panelTitle(`Todos (${done}/${todos.length})`);
   const lines: string[] = [...panelHeader(title, width)];
 
   if (todos.length === 0) {

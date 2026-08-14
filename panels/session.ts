@@ -1,5 +1,5 @@
 import type { SidebarContext } from "../types.ts";
-import { dim, fg, COLORS, panelHeader, trunc } from "../colors.ts";
+import { dim, fg, COLORS, panelHeader, panelTitle, trunc } from "../colors.ts";
 
 const NA = "—";
 
@@ -13,7 +13,7 @@ function formatDuration(ms: number): string {
 }
 
 export function renderSessionPanel(ctx: SidebarContext, width: number): string[] {
-  const lines: string[] = [...panelHeader("Session", width)];
+  const lines: string[] = [...panelHeader(panelTitle("Session"), width)];
 
   const title = ctx.sessionTitle;
   if (!title) {

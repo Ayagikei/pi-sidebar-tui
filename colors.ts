@@ -131,3 +131,22 @@ export function panelHeader(title: string, width: number): string[] {
     dim("─".repeat(separatorLen)),
   ];
 }
+
+// Emoji prefixes for panel titles
+const PANEL_EMOJI: Record<string, string> = {
+  "Session":         "📍",
+  "Todos":           "📋",
+  "Subagents":       "🤖",
+  "MCP Servers":     "🔌",
+  "Workspace":       "📁",
+};
+
+export function panelTitle(title: string): string {
+  // Match by prefix (e.g. "Todos (2/5)" matches "Todos")
+  for (const [key, emoji] of Object.entries(PANEL_EMOJI)) {
+    if (title === key || title.startsWith(key + " ") || title.startsWith(key + "(")) {
+      return `${emoji} ${title}`;
+    }
+  }
+  return title;
+}

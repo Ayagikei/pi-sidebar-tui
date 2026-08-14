@@ -1,11 +1,11 @@
 import type { SidebarContext } from "../types.ts";
-import { dim, fg, COLORS, panelHeader } from "../colors.ts";
+import { dim, fg, COLORS, panelHeader, panelTitle } from "../colors.ts";
 
 export function renderMcpPanel(ctx: SidebarContext, width: number): string[] {
   const servers = ctx.mcpServers;
   if (!servers || servers.length === 0) return [];
 
-  const lines: string[] = [...panelHeader("MCP Servers", width)];
+  const lines: string[] = [...panelHeader(panelTitle("MCP Servers"), width)];
 
   for (const srv of servers) {
     const dot = srv.connected

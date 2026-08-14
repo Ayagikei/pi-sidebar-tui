@@ -1,6 +1,6 @@
 import type { SidebarContext, SubagentEntry } from "../types.ts";
 import {
-  dim, fg, COLORS, panelHeader, trunc,
+  dim, fg, COLORS, panelHeader, panelTitle, trunc,
   formatDuration, formatRelativeTime, formatTokens, spinnerFrame,
 } from "../colors.ts";
 
@@ -57,7 +57,7 @@ export function renderSubagentsPanel(ctx: SidebarContext, width: number): string
   const completed = subagents.filter(a => a.status === "completed").length;
 
   const parallelSuffix = running > 1 ? " · parallel" : "";
-  const title = `Subagents (${completed}/${subagents.length})${parallelSuffix}`;
+  const title = panelTitle(`Subagents (${completed}/${subagents.length})${parallelSuffix}`);
   const lines: string[] = [...panelHeader(title, width)];
 
   if (subagents.length === 0) {
