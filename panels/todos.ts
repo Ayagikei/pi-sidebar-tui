@@ -14,26 +14,53 @@ const GLYPH_COLORS: Record<TodoStatus, string> = {
   pending: COLORS.muted,
 };
 
-function renderTodoLine(todo: TodoItem, width: number): string {
-  const glyph = fg(GLYPH_COLORS[todo.status], GLYPHS[todo.status]);
-  const glyphWidth = 1; // all glyphs are 1 visible char
-  const spaceAfterGlyph = 1;
-  const indent = glyphWidth + spaceAfterGlyph;
+const INDENT = 2; // glyph(1) + space(1)
+const CONTINUE_INDENT = 2; // continuation lines align under content
 
-  if (todo.status === "in_progress" && todo.subAction) {
-    const subText = ` (${todo.subAction})`;
-    const contentMax = Math.max(0, width - indent);
-    const fullText = todo.content + subText;
-    if (visibleWidth(fullText) <= contentMax) {
-      return `${glyph} ${todo.content}${dim(subText)}`;
+/** Wrap text to fit within maxWidth, returning an array of lines. */
+function wrapText(text: string, maxWidth: number): string[] {
+  if (maxWidth <= 0) return [""];
+  if (visibleWidth(text) <= maxWidth) return [text];
+
+  const lines: string[] = [];
+  let remaining = text;
+  while (visibleWidth(remaining) > maxWidth && remaining.length > 0) {
+    // Find the longest prefix that fits
+    let cut = 0;
+    let w = 0;
+    for (const ch of remaining) {
+      const cw = visibleWidth(ch);
+      if (w + cw > maxWidth) break;
+      cut += ch.length; // advance by code units, not visible width
+      w += cw;
     }
-    const contentTruncated = trunc(todo.content, Math.max(0, contentMax - 4));
-    return `${glyph} ${contentTruncated}`;
+    if (cut === 0) cut = remaining.length; // single wide char, force it
+    lines.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut);
+  }
+  if (remaining.length > 0) lines.push(remaining);
+  return lines;
+}
+
+function renderTodoLines(todo: TodoItem, width: number): string[] {
+  const glyph = fg(GLYPH_COLORS[todo.status], GLYPHS[todo.status]);
+  const contentMax = Math.max(0, width - INDENT);
+
+  let text = todo.content;
+  if (todo.status === "in_progress" && todo.subAction) {
+    text = `${todo.content} (${todo.subAction})`;
   }
 
-  const contentMax = Math.max(0, width - indent);
-  const content = trunc(todo.content, contentMax);
-  return `${glyph} ${content}`;
+  const wrapped = wrapText(text, contentMax);
+  const result: string[] = [];
+  for (let i = 0; i < wrapped.length; i++) {
+    if (i === 0) {
+      result.push(`${glyph} ${wrapped[i]}`);
+    } else {
+      result.push(`${" ".repeat(CONTINUE_INDENT)}${dim(wrapped[i])}`);
+    }
+  }
+  return result;
 }
 
 export function renderTodosPanel(ctx: SidebarContext, width: number): string[] {
@@ -48,7 +75,7 @@ export function renderTodosPanel(ctx: SidebarContext, width: number): string[] {
   }
 
   for (const todo of todos) {
-    lines.push(renderTodoLine(todo, width));
+    lines.push(...renderTodoLines(todo, width));
   }
 
   return lines;

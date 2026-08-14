@@ -1,10 +1,11 @@
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { SidebarContext } from "./types.ts";
 import { renderSidebar } from "./sidebar.ts";
 import { dim } from "./colors.ts";
 
-const SIDEBAR_BG = "\x1b[48;2;0;0;0m"; // black — matches terminal bg, hides scroll flash
-const BG_RESET = "\x1b[49m";
+// No forced background — let the terminal's own bg show through.
+// The original black bg (\x1b[48;2;0;0;0m) looked out of place on
+// themed terminals (e.g. everforest).
 
 function moveCursor(row: number, col: number): string {
   return `\x1b[${row};${col}H`;
@@ -82,29 +83,14 @@ export class SidebarCompositor {
     buf += "\x1b7";          // save cursor (DECSC)
     buf += "\x1b[?7l";       // disable auto-wrap
 
-    // Format cwd for bottom row: collapse home dir, truncate from left if needed
-    const cwd = ctx.cwd ?? "";
-    const home = process.env["HOME"] ?? "";
-    const cwdDisplay = home && cwd.startsWith(home) ? "~" + cwd.slice(home.length) : cwd;
-    const cwdTruncated = visibleWidth(cwdDisplay) > sw - 1
-      ? "…" + cwdDisplay.slice(-(sw - 2))
-      : cwdDisplay;
-    const cwdLine = dim(" " + cwdTruncated);
-
     for (let row = 1; row <= rawRows; row++) {
       buf += moveCursor(row, sepCol);
       buf += dim("│");
       buf += moveCursor(row, sidebarCol);
-      buf += SIDEBAR_BG;
-      if (row === rawRows && cwd) {
-        buf += truncateToWidth(cwdLine, sw, "", true);
-      } else {
-        const line = lines[row - 1];
-        buf += line !== undefined
-          ? truncateToWidth(line, sw, "", true)
-          : " ".repeat(sw);
-      }
-      buf += BG_RESET;
+      const line = lines[row - 1];
+      buf += line !== undefined
+        ? truncateToWidth(line, sw, "", true)
+        : " ".repeat(sw);
     }
 
     buf += "\x1b[?7h";       // enable auto-wrap
