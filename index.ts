@@ -8,6 +8,7 @@ import { setPiTheme } from "./colors.ts";
 
 const TOOL_LOG_MAX = 10;
 const SUBAGENT_TOOL_PATTERN = /^(subagent|task|dispatch|agent)/i;
+const SUBAGENT_COMPLETED_MAX = 3; // keep at most N completed/failed entries
 const TODO_TOOL_PATTERN = /todo/i;
 const WRITE_TOOLS = new Set(["write", "edit", "bash", "computer"]);
 
@@ -199,9 +200,18 @@ function parseTodos(input: unknown): TodoItem[] | null {
 function extractSubagentName(input: unknown): string {
   if (!input || typeof input !== "object") return "subagent";
   const obj = input as Record<string, unknown>;
+  // pi-subagents uses "agent" for the role name, "task" for the task text
+  const agent = obj["agent"];
+  const task = obj["task"];
+  if (typeof agent === "string" && agent.trim()) {
+    // Use agent role name as the display name; append short task if room
+    const shortTask = typeof task === "string" ? task.split("\n")[0].slice(0, 30) : "";
+    const label = shortTask ? `${agent}: ${shortTask}` : agent;
+    return label.slice(0, 60);
+  }
   const name = obj["name"] ?? obj["title"] ?? obj["description"] ?? obj["task"];
-  if (typeof name !== "string") return "subagent";
-  return name.split("\n")[0].slice(0, 60);
+  if (typeof name === "string") return name.split("\n")[0].slice(0, 60);
+  return "subagent";
 }
 
 export default function piSidebar(pi: ExtensionAPI) {
@@ -401,6 +411,33 @@ export default function piSidebar(pi: ExtensionAPI) {
       if (activeSubagentId === toolCallId) {
         activeSubagentId = null;
       }
+      // Extract real metrics from tool_result details (provided by pi-subagents)
+      const details = (event as any).details;
+      if (details?.results?.length > 0) {
+        const firstResult = details.results[0];
+        const usage = firstResult.usage;
+        if (usage) {
+          entry.turns = usage.turns ?? entry.turns;
+          entry.tokens = (usage.input ?? 0) + (usage.output ?? 0) || entry.tokens;
+        }
+        const ps = firstResult.progressSummary;
+        if (ps) {
+          entry.toolCount = ps.toolCount ?? entry.toolCount;
+          if (ps.tokens) entry.tokens = ps.tokens;
+          if (ps.durationMs) {
+            // Use actual duration from progress summary
+            entry.startedAt = entry.completedAt - ps.durationMs;
+          }
+        }
+      }
+      // Evict oldest completed entries to prevent unbounded growth
+      const completedIds = Array.from(subagentsMap.entries())
+        .filter(([, e]) => e.status === "completed" || e.status === "failed")
+        .sort((a, b) => (a[1].completedAt ?? 0) - (b[1].completedAt ?? 0));
+      while (completedIds.length > SUBAGENT_COMPLETED_MAX) {
+        const [oldestId] = completedIds.shift()!;
+        subagentsMap.delete(oldestId);
+      }
       requestRender?.();
     }
   });
@@ -461,15 +498,8 @@ export default function piSidebar(pi: ExtensionAPI) {
         msgStartMs = null;
       }
     }
-    if (activeSubagentId) {
-      const active = subagentsMap.get(activeSubagentId);
-      if (active) {
-        active.turns++;
-        if (usage && typeof usage.output === "number") {
-          active.tokens += (usage.input ?? 0) + (usage.output ?? 0);
-        }
-      }
-    }
+    // Subagent metrics are extracted from tool_result details, not parent
+    // message_end events — the parent never sees child turns/tokens here.
     requestRender?.();
   });
 
@@ -580,6 +610,20 @@ export default function piSidebar(pi: ExtensionAPI) {
         `Sidebar ${sidebarEnabled ? "enabled" : "disabled"}`,
         "info"
       );
+    },
+  });
+
+  // Sidebar scroll shortcuts: Alt+J (down), Alt+K (up)
+  pi.registerShortcut("alt+j", {
+    description: "Scroll sidebar down",
+    handler: async () => {
+      compositorRef?.scroll(1);
+    },
+  });
+  pi.registerShortcut("alt+k", {
+    description: "Scroll sidebar up",
+    handler: async () => {
+      compositorRef?.scroll(-1);
     },
   });
 

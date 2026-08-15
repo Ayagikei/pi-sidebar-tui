@@ -31,6 +31,8 @@ export class SidebarCompositor {
   private disposed = false;
 
   private readonly sidebarWidth: number;
+  private scrollOffset = 0;
+  private lastLineCount = 0;
 
   constructor(tui: any, getCtx: () => SidebarContext, sidebarWidth = 40) {
     this.tui = tui;
@@ -77,7 +79,16 @@ export class SidebarCompositor {
     const sepCol = rawCols - sw;
     const sidebarCol = sepCol + 1;
     const ctx = this.getCtx();
-    const lines = renderSidebar(ctx, sw);
+    const allLines = renderSidebar(ctx, sw);
+    this.lastLineCount = allLines.length;
+
+    // Clamp scroll offset to valid range
+    const maxOffset = Math.max(0, allLines.length - rawRows);
+    if (this.scrollOffset > maxOffset) this.scrollOffset = maxOffset;
+    if (this.scrollOffset < 0) this.scrollOffset = 0;
+
+    // Lines visible in the current viewport (from scrollOffset)
+    const lines = allLines.slice(this.scrollOffset, this.scrollOffset + rawRows);
 
     let buf = "\x1b[?2026h"; // begin synchronized output
     buf += "\x1b7";          // save cursor (DECSC)
@@ -91,6 +102,18 @@ export class SidebarCompositor {
       buf += line !== undefined
         ? truncateToWidth(line, sw, "", true)
         : " ".repeat(sw);
+    }
+
+    // Scroll indicators: show arrows on the separator when content overflows
+    const hasMoreUp = this.scrollOffset > 0;
+    const hasMoreDown = this.scrollOffset < maxOffset;
+    if (hasMoreUp) {
+      buf += moveCursor(1, sepCol);
+      buf += dim("↑");
+    }
+    if (hasMoreDown) {
+      buf += moveCursor(rawRows, sepCol);
+      buf += dim("↓");
     }
 
     buf += "\x1b[?7h";       // enable auto-wrap
@@ -114,4 +137,14 @@ export class SidebarCompositor {
       this.tui.doRender = this.originalDoRender;
     }
   }
+
+  scroll(delta: number): void {
+    if (this.disposed) return;
+    const maxOffset = Math.max(0, this.lastLineCount - this.terminal.rows);
+    this.scrollOffset = Math.max(0, Math.min(maxOffset, this.scrollOffset + delta));
+    this.paint();
+  }
+
+  get canScrollUp(): boolean { return this.scrollOffset > 0; }
+  get canScrollDown(): boolean { return this.scrollOffset < this.lastLineCount - this.terminal.rows; }
 }
