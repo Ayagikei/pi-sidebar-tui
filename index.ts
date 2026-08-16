@@ -197,6 +197,44 @@ function parseTodos(input: unknown): TodoItem[] | null {
   return result;
 }
 
+/**
+ * Parse the full task list from a todo tool_result `details` envelope
+ * (rpiv-todo shape: `details.tasks` with {id, subject, status, activeForm}).
+ * Returns null when the envelope isn't a task list, mirroring parseTodos.
+ */
+export function parseTasksFromDetails(details: unknown): TodoItem[] | null {
+  if (!details || typeof details !== "object") return null;
+  const tasks = (details as Record<string, unknown>)["tasks"];
+  if (!Array.isArray(tasks)) return null;
+
+  const result: TodoItem[] = [];
+  for (const item of tasks) {
+    if (!item || typeof item !== "object") continue;
+    const i = item as Record<string, unknown>;
+    const content = typeof i["subject"] === "string" ? i["subject"]
+      : typeof i["content"] === "string" ? i["content"]
+      : typeof i["text"] === "string" ? i["text"] : null;
+    const status = typeof i["status"] === "string" ? i["status"] : "pending";
+    if (!content || status === "deleted") continue;
+
+    const normalizedStatus =
+      status === "in_progress" || status === "active" ? "in_progress" :
+      status === "completed" || status === "done" ? "completed" : "pending";
+
+    const subAction = normalizedStatus === "in_progress" && typeof i["activeForm"] === "string"
+      ? i["activeForm"]
+      : typeof i["subAction"] === "string" ? i["subAction"] : undefined;
+
+    result.push({
+      id: typeof i["id"] === "number" ? String(i["id"]) : String(result.length),
+      content,
+      status: normalizedStatus,
+      subAction,
+    });
+  }
+  return result;
+}
+
 function extractSubagentName(input: unknown): string {
   if (!input || typeof input !== "object") return "subagent";
   const obj = input as Record<string, unknown>;
@@ -399,6 +437,14 @@ export default function piSidebar(pi: ExtensionAPI) {
   pi.on("tool_result", async (event) => {
     const toolName = (event as any).toolName ?? "";
     const toolCallId = (event as any).toolCallId ?? toolName;
+
+    if (TODO_TOOL_PATTERN.test(toolName)) {
+      const parsed = parseTasksFromDetails((event as any).details);
+      if (parsed !== null) {
+        todos = parsed;
+        requestRender?.();
+      }
+    }
 
     if (WRITE_TOOLS.has(toolName.toLowerCase())) {
       invalidateWorkspaceCache();

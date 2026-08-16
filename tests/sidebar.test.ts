@@ -38,6 +38,9 @@ function makeCtx(overrides: Partial<SidebarContext> = {}): SidebarContext {
     liveTps: null,
     lastTps: null,
     lastTurnMs: null,
+    turnDurations: [],
+    agentActive: false,
+    currentTurnMs: null,
     ...overrides,
   };
 }

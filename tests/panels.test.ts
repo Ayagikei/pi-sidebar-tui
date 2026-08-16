@@ -6,6 +6,7 @@ import { renderSessionPanel } from "../panels/session.ts";
 import { renderTodosPanel } from "../panels/todos.ts";
 import { renderSubagentsPanel } from "../panels/subagents.ts";
 import { renderWorkspacePanel } from "../panels/workspace.ts";
+import { parseTasksFromDetails } from "../index.ts";
 
 function strip(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -41,6 +42,9 @@ function makeCtx(overrides: Partial<SidebarContext> = {}): SidebarContext {
     liveTps: null,
     lastTps: null,
     lastTurnMs: null,
+    turnDurations: [],
+    agentActive: false,
+    currentTurnMs: null,
     ...overrides,
   };
 }
@@ -328,4 +332,30 @@ test("workspace panel: no line exceeds width", () => {
   for (const line of lines) {
     assert.ok(visibleWidth(strip(line)) <= 30, `line too wide: "${strip(line)}"`);
   }
+});
+
+// ─── Todo details parsing (tool_result envelope) ─────────────────────────────
+
+test("parseTasksFromDetails: maps rpiv-todo tasks envelope to TodoItem[]", () => {
+  const parsed = parseTasksFromDetails({
+    tasks: [
+      { id: 1, subject: "Fix the auth bug", status: "completed" },
+      { id: 2, subject: "Write tests", status: "in_progress", activeForm: "writing tests" },
+      { id: 3, subject: "Ship release", status: "pending" },
+      { id: 4, subject: "garbage", status: "deleted" },
+    ],
+  });
+  assert.ok(parsed !== null, "expected a parsed list");
+  assert.equal(parsed!.length, 3, "deleted tasks must be filtered out");
+  assert.deepEqual(parsed![1], {
+    id: "2",
+    content: "Write tests",
+    status: "in_progress",
+    subAction: "writing tests",
+  });
+});
+
+test("parseTasksFromDetails: non-task envelope returns null", async () => {
+  assert.equal(parseTasksFromDetails({ params: { action: "create" } }), null);
+  assert.equal(parseTasksFromDetails(null), null);
 });
