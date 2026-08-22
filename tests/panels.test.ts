@@ -45,6 +45,8 @@ function makeCtx(overrides: Partial<SidebarContext> = {}): SidebarContext {
     turnDurations: [],
     agentActive: false,
     currentTurnMs: null,
+    deskPercent: null,
+    deskNote: null,
     ...overrides,
   };
 }
@@ -82,6 +84,49 @@ test("session panel: header line contains 'Session'", () => {
   const ctx = makeCtx({});
   const lines = renderSessionPanel(ctx, 40);
   assert.ok(lines.map(strip).some(l => l.includes("Session")));
+});
+
+test("session panel: hides progress bar when percent is unknown", () => {
+  const lines = renderSessionPanel(makeCtx({ sessionTitle: "Desk Brief UI" }), 40);
+  const text = lines.map(strip).join("\n");
+  assert.equal(text.includes("%"), false, `unexpected percent, got: ${text}`);
+  assert.equal(text.includes("█"), false);
+});
+
+test("session panel: shows progress bar, percent, and note", () => {
+  const lines = renderSessionPanel(makeCtx({
+    sessionTitle: "Compose 跨平台迁移",
+    deskPercent: 62,
+    deskNote: "D7G 已验收，D7H Home 正在实施",
+  }), 40);
+  const text = lines.map(strip).join("\n");
+  assert.ok(text.includes("62%"), `missing percent, got: ${text}`);
+  assert.ok(text.includes("█"), `missing filled bar, got: ${text}`);
+  assert.ok(text.includes("░"), `missing empty bar, got: ${text}`);
+  assert.ok(text.includes("D7G 已验收"), `missing note, got: ${text}`);
+  for (const line of lines) {
+    assert.ok(visibleWidth(strip(line)) <= 40, `line too wide: "${strip(line)}"`);
+  }
+});
+
+test("session panel: 100 percent fills the bar", () => {
+  const lines = renderSessionPanel(makeCtx({
+    sessionTitle: "Done",
+    deskPercent: 100,
+  }), 40);
+  const text = lines.map(strip).join("\n");
+  assert.ok(text.includes("100%"), `missing percent, got: ${text}`);
+  assert.equal(text.includes("░"), false, `empty slots on a full bar: ${text}`);
+});
+
+test("session panel: 0 percent shows an empty bar", () => {
+  const lines = renderSessionPanel(makeCtx({
+    sessionTitle: "Just started",
+    deskPercent: 0,
+  }), 40);
+  const text = lines.map(strip).join("\n");
+  assert.ok(text.includes("0%"), `missing percent, got: ${text}`);
+  assert.ok(text.includes("░"), `missing empty bar, got: ${text}`);
 });
 
 // ─── Todos panel ─────────────────────────────────────────────────────────────

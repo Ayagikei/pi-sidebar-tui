@@ -12,6 +12,23 @@ function formatDuration(ms: number): string {
   return `${s}s`;
 }
 
+function renderProgressBar(percent: number, width: number): string {
+  const label = `${percent}%`;
+  const indent = 2;
+  const gap = 1;
+  const barWidth = Math.max(4, width - indent - gap - label.length);
+  const filled = Math.round((percent / 100) * barWidth);
+  const empty = Math.max(0, barWidth - filled);
+  const fillColor = percent >= 100 ? COLORS.success : COLORS.accent;
+  return (
+    " ".repeat(indent) +
+    fg(fillColor, "█".repeat(filled)) +
+    dim("░".repeat(empty)) +
+    " " +
+    fg(fillColor, label)
+  );
+}
+
 export function renderSessionPanel(ctx: SidebarContext, width: number): string[] {
   const lines: string[] = [...panelHeader(panelTitle("Session"), width)];
 
@@ -21,6 +38,13 @@ export function renderSessionPanel(ctx: SidebarContext, width: number): string[]
   } else {
     const truncated = trunc(title, Math.max(0, width - 2));
     lines.push(fg(COLORS.model, `  ${truncated}`));
+  }
+
+  if (typeof ctx.deskPercent === "number") {
+    lines.push(renderProgressBar(ctx.deskPercent, width));
+    if (ctx.deskNote) {
+      lines.push(dim(`  ${trunc(ctx.deskNote, Math.max(0, width - 2))}`));
+    }
   }
 
   // Short session ID (first 8 chars)

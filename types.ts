@@ -70,4 +70,8 @@ export interface SidebarContext {
   agentActive: boolean;
   /** Elapsed ms of the current agent turn (if active). */
   currentTurnMs: number | null;
+  /** Overall task percent from desk_progress, or null when unknown. */
+  deskPercent: number | null;
+  /** Short status line from the latest desk_progress note. */
+  deskNote: string | null;
 }

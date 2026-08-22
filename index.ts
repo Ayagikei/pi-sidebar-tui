@@ -5,6 +5,14 @@ import { getWorkspaceData, invalidateWorkspaceCache } from "./workspace.ts";
 import { SidebarCompositor } from "./compositor.ts";
 import { getMcpServers } from "./mcp.ts";
 import { setPiTheme } from "./colors.ts";
+import {
+  inferDeskProgress,
+  loadDeskOverlay,
+  parseDeskProgress,
+  type DeskProgress,
+} from "./desk-progress.ts";
+
+export { parseDeskProgress, inferDeskProgress, loadDeskOverlay };
 
 const TOOL_LOG_MAX = 10;
 const SUBAGENT_TOOL_PATTERN = /^(subagent|task|dispatch|agent)/i;
@@ -45,6 +53,18 @@ const TURN_HISTORY_MAX = 8;
 let tpsSamples: { t: number; tokens: number }[] = [];
 const TPS_WINDOW_MS = 2000;
 let sessionTimerHandle: ReturnType<typeof setInterval> | null = null;
+let deskPercent: number | null = null;
+let deskNote: string | null = null;
+
+function isSubagentChild(): boolean {
+  return process.env.PI_SUBAGENT_CHILD === "1";
+}
+
+function applyDeskProgress(progress: DeskProgress, opts?: { keepTitle?: boolean }): void {
+  deskPercent = progress.percent;
+  if (progress.note !== null) deskNote = progress.note;
+  if (progress.title && !opts?.keepTitle) sessionTitle = progress.title;
+}
 
 function inferThinkingLevel(sm: any): string | null {
   try {
@@ -150,6 +170,8 @@ function buildSidebarContext(cwd: string | undefined): SidebarContext {
     turnDurations,
     agentActive: agentStartMs !== null,
     currentTurnMs: agentStartMs !== null ? Date.now() - agentStartMs : null,
+    deskPercent,
+    deskNote,
   };
 }
 
@@ -260,7 +282,15 @@ export default function piSidebar(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     sessionManager = ctx.sessionManager;
-    sessionTitle = ctx.sessionManager.getSessionName() ?? inferSessionTitle(ctx.sessionManager) ?? null;
+    const named = ctx.sessionManager.getSessionName() ?? null;
+    sessionTitle = named ?? inferSessionTitle(ctx.sessionManager) ?? null;
+    deskPercent = null;
+    deskNote = null;
+    if (!isSubagentChild()) {
+      const seeded = inferDeskProgress(ctx.sessionManager)
+        ?? loadDeskOverlay(ctx.sessionManager.getSessionId?.() ?? null);
+      if (seeded) applyDeskProgress(seeded, { keepTitle: Boolean(named) });
+    }
     todos = [];
     subagentsMap.clear();
     activeSubagentId = null;
@@ -371,6 +401,8 @@ export default function piSidebar(pi: ExtensionAPI) {
     turnDurations = [];
     tpsSamples = [];
     sessionTitle = null;
+    deskPercent = null;
+    deskNote = null;
     todos = [];
     subagentsMap.clear();
     activeSubagentId = null;
@@ -380,10 +412,13 @@ export default function piSidebar(pi: ExtensionAPI) {
     currentCwd = (ctx as any).cwd;
     if (sessionTitle === null && typeof (event as any).prompt === "string") {
       const raw = (event as any).prompt as string;
-      sessionTitle = summarizePrompt(raw);
+      const inferred = summarizePrompt(raw);
+      sessionTitle = inferred;
       generateTitleWithModel(raw, ctx, (title) => {
-        sessionTitle = title;
-        requestRender?.();
+        if (sessionTitle === inferred) {
+          sessionTitle = title;
+          requestRender?.();
+        }
       });
     }
     updateContextUsage(ctx);
@@ -396,7 +431,13 @@ export default function piSidebar(pi: ExtensionAPI) {
     const input = (event as any).input;
     const toolCallId = (event as any).toolCallId ?? toolName;
 
-    if (TODO_TOOL_PATTERN.test(toolName)) {
+    if (toolName === "desk_progress") {
+      if (!isSubagentChild()) {
+        const parsed = parseDeskProgress(input);
+        if (parsed) applyDeskProgress(parsed);
+      }
+      requestRender?.();
+    } else if (TODO_TOOL_PATTERN.test(toolName)) {
       const parsed = parseTodos(input);
       if (parsed !== null) {
         todos = parsed;

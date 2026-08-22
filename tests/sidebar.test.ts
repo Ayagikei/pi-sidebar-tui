@@ -41,6 +41,8 @@ function makeCtx(overrides: Partial<SidebarContext> = {}): SidebarContext {
     turnDurations: [],
     agentActive: false,
     currentTurnMs: null,
+    deskPercent: null,
+    deskNote: null,
     ...overrides,
   };
 }
@@ -51,7 +53,7 @@ test("sidebar stacks all 4 panels", () => {
   const text = lines.map(strip).join("\n");
   assert.ok(text.includes("Session"), "missing Session panel");
   assert.ok(text.includes("Todos"), "missing Todos panel");
-  assert.ok(text.includes("Async Subagents"), "missing Subagents panel");
+  assert.ok(text.includes("Subagents"), "missing Subagents panel");
   assert.ok(text.includes("Workspace"), "missing Workspace panel");
 });
 
